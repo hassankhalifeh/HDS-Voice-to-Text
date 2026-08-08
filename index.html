@@ -196,6 +196,23 @@
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
  
   let recognition = null, isRecording = false, finalTranscript = '';
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+ 
+  // يزيل أي تداخل متكرر بين نهاية النص الحالي وبداية المقطع الجديد
+  // (يحدث على الهاتف عند إعادة تشغيل التعرف بسرعة فيُعاد التقاط 2-3 كلمات سابقة)
+  function stripOverlap(existing, incoming) {
+    const existingWords = existing.trim().split(/\s+/).filter(Boolean);
+    const incomingWords = incoming.trim().split(/\s+/).filter(Boolean);
+    const maxCheck = Math.min(existingWords.length, incomingWords.length, 6);
+    for (let len = maxCheck; len > 0; len--) {
+      const suffix = existingWords.slice(-len).join(' ');
+      const prefix = incomingWords.slice(0, len).join(' ');
+      if (suffix === prefix) {
+        return incomingWords.slice(len).join(' ');
+      }
+    }
+    return incoming;
+  }
  
   if (!SpeechRecognition) {
     unsupportedWarning.style.display = 'block';
@@ -208,17 +225,14 @@
  
     recognition.onstart = () => statusEl.textContent = 'الحالة: جاري الاستماع...';
  
-    let lastFinalChunk = '';
- 
     recognition.onresult = (event) => {
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const t = event.results[i][0].transcript.trim();
         if (event.results[i].isFinal) {
-          // تجاهل التكرار إذا كان نفس المقطع الأخير (يحدث عند إعادة تشغيل التعرف تلقائياً)
-          if (t && t !== lastFinalChunk) {
-            finalTranscript += t + ' ';
-            lastFinalChunk = t;
+          if (t) {
+            const cleaned = stripOverlap(finalTranscript, t);
+            if (cleaned) finalTranscript += cleaned + ' ';
           }
         } else {
           interim += t;
@@ -229,11 +243,18 @@
  
     recognition.onerror = (e) => statusEl.textContent = 'خطأ: ' + e.error;
  
-    // لا نعيد تشغيل التعرف تلقائياً بعد توقفه — إعادة التشغيل التلقائي هي السبب
-    // الرئيسي لتكرار الكلمات على متصفحات الهاتف. إذا توقف الاستماع من تلقاء نفسه
-    // (بعد صمت قصير)، فقط نحدّث الواجهة ونطلب من المستخدم الضغط على "ابدأ" مجدداً.
     recognition.onend = () => {
-      if (isRecording) {
+      if (!isRecording) return;
+      if (isMobile) {
+        // على الهاتف: نعيد التشغيل تلقائياً (مع معالجة التداخل أعلاه) لتفادي التوقف المتكرر
+        statusEl.textContent = 'الحالة: جاري الاستماع...';
+        setTimeout(() => {
+          if (isRecording) {
+            try { recognition.start(); } catch (e) { /* يعمل بالفعل */ }
+          }
+        }, 200);
+      } else {
+        // على الكمبيوتر: لا نعيد التشغيل تلقائياً (هذا السلوك أثبت استقراره)
         isRecording = false;
         recordBtn.textContent = '🎤 ابدأ التسجيل';
         recordBtn.classList.remove('btn-red');
@@ -245,7 +266,6 @@
     recordBtn.addEventListener('click', () => {
       if (!isRecording) {
         finalTranscript = currentSegment.value ? currentSegment.value + ' ' : '';
-        lastFinalChunk = '';
         recognition.start();
         isRecording = true;
         recordBtn.textContent = '⏹ إيقاف التسجيل';

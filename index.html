@@ -78,15 +78,15 @@
 <div class="container">
   <h1>🎤 تحويل الصوت إلى نص - حسب الأقسام</h1>
   <p class="subtitle">كل عملية تسجيل تُحفظ كملف Word مستقل</p>
-
+ 
   <div id="unsupportedWarning" class="warning">
     ⚠️ متصفحك لا يدعم التعرف على الصوت. استخدم Chrome.
   </div>
-
+ 
   <!-- بيانات العملية -->
   <fieldset>
     <legend>بيانات العملية</legend>
-
+ 
     <label>القسم</label>
     <div class="row">
       <div>
@@ -94,19 +94,24 @@
       </div>
       <button class="btn-grey" id="addDeptBtn">+ قسم جديد</button>
     </div>
-
+ 
     <label>نوع العملية</label>
     <input type="text" id="opType" placeholder="مثال: تسجيل استلام، جرد، ملاحظة">
-
+ 
     <label>اسم الطرف / المصدر</label>
-    <input type="text" id="partyName" placeholder="مثال: شركة الأمل">
-
+    <div class="row">
+      <div>
+        <select id="partySelect"></select>
+      </div>
+      <button class="btn-grey" id="addPartyBtn">+ مصدر جديد</button>
+    </div>
+ 
     <label>التاريخ</label>
     <input type="date" id="opDate">
-
+ 
     <div class="filename-preview" id="filenamePreview"></div>
   </fieldset>
-
+ 
   <!-- التسجيل -->
   <fieldset>
     <legend>تسجيل مقطع جديد</legend>
@@ -120,7 +125,7 @@
       <button id="discardSegmentBtn" class="btn-grey">✖ تجاهل المقطع</button>
     </div>
   </fieldset>
-
+ 
   <!-- المقاطع المؤكدة -->
   <fieldset>
     <legend>المقاطع المؤكدة في هذه العملية</legend>
@@ -128,17 +133,17 @@
       <div class="empty-note">لا توجد مقاطع مؤكدة بعد</div>
     </div>
   </fieldset>
-
+ 
   <div class="buttons">
     <button id="finishBtn" class="btn-blue" style="min-width:220px;">💾 إنهاء وإقفال المستند (حفظ Word)</button>
   </div>
 </div>
-
+ 
 <script>
   // ---------- الأقسام ----------
   const deptSelect = document.getElementById('deptSelect');
   let departments = ['الاستلام', 'التحميل', 'المرتجعات'];
-
+ 
   function renderDepartments() {
     deptSelect.innerHTML = '';
     departments.forEach(d => {
@@ -148,7 +153,7 @@
     });
   }
   renderDepartments();
-
+ 
   document.getElementById('addDeptBtn').addEventListener('click', () => {
     const name = prompt('اسم القسم الجديد:');
     if (name && name.trim()) {
@@ -158,45 +163,92 @@
       updateFilenamePreview();
     }
   });
-
+ 
+  // ---------- المصادر (من ملف Orders_HDS - صفحة المعلومات الرئيسية، عمود B) ----------
+  const partySelect = document.getElementById('partySelect');
+  let parties = [
+    'Fast Delivery', 'A Z علي دهيني', 'Eleganza  محمد الدر', 'حشّوش',
+    'محمد حمود Spiky', 'فاطمة فركوح', 'WAKA', 'NEUF NEUF', 'Eyeconic',
+    'متفرقات', 'ريان طبل', 'البقاعي', 'Vengo', 'محمد جهاد عكوش',
+    'System Tunes البرنامج', 'علي أخضر', 'أحمد حموي', 'ITOS',
+    'BS International', 'أبو صالح', 'Ya Delivery', 'نسرين عباية',
+    'Outlet Adam', 'زهراء أون لاين', 'D Fast', 'علي علامة'
+  ];
+ 
+  function renderParties() {
+    partySelect.innerHTML = '';
+    parties.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p; opt.textContent = p;
+      partySelect.appendChild(opt);
+    });
+  }
+  renderParties();
+ 
+  document.getElementById('addPartyBtn').addEventListener('click', () => {
+    const name = prompt('اسم المصدر الجديد:');
+    if (name && name.trim()) {
+      parties.push(name.trim());
+      renderParties();
+      partySelect.value = name.trim();
+      updateFilenamePreview();
+    }
+  });
+ 
   // ---------- الحقول ----------
   const opType = document.getElementById('opType');
-  const partyName = document.getElementById('partyName');
   const opDate = document.getElementById('opDate');
   const filenamePreview = document.getElementById('filenamePreview');
-
+ 
   // التاريخ الافتراضي = اليوم
   opDate.value = new Date().toISOString().split('T')[0];
-
+ 
   // سجل أسماء الملفات المولّدة في هذه الجلسة (للترقيم v1, v2...)
   const generatedFilenames = {};
-
+ 
   function sanitize(str) {
     return (str || '').trim().replace(/[\\/:*?"<>|]/g, '_') || 'بدون_اسم';
   }
-
+ 
   function buildBaseFilename() {
-    return `${sanitize(opType.value)}-${sanitize(partyName.value)}-${opDate.value || ''}`;
+    return `${sanitize(opType.value)}-${sanitize(partySelect.value)}-${opDate.value || ''}`;
   }
-
+ 
   function updateFilenamePreview() {
     const base = buildBaseFilename();
     const count = generatedFilenames[base] || 0;
     const suffix = count > 0 ? `-v${count + 1}` : '';
     filenamePreview.textContent = `سيُحفظ باسم: ${base}${suffix}.doc`;
   }
-  [opType, partyName, opDate].forEach(el => el.addEventListener('input', updateFilenamePreview));
+  [opType, partySelect, opDate].forEach(el => el.addEventListener('input', updateFilenamePreview));
   updateFilenamePreview();
-
+ 
   // ---------- التعرف على الصوت ----------
   const recordBtn = document.getElementById('recordBtn');
   const statusEl = document.getElementById('status');
   const currentSegment = document.getElementById('currentSegment');
   const unsupportedWarning = document.getElementById('unsupportedWarning');
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
+ 
   let recognition = null, isRecording = false, finalTranscript = '';
-
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+ 
+  // يزيل أي تداخل متكرر بين نهاية النص الحالي وبداية المقطع الجديد
+  // (يحدث على الهاتف عند إعادة تشغيل التعرف بسرعة فيُعاد التقاط 2-3 كلمات سابقة)
+  function stripOverlap(existing, incoming) {
+    const existingWords = existing.trim().split(/\s+/).filter(Boolean);
+    const incomingWords = incoming.trim().split(/\s+/).filter(Boolean);
+    const maxCheck = Math.min(existingWords.length, incomingWords.length, 6);
+    for (let len = maxCheck; len > 0; len--) {
+      const suffix = existingWords.slice(-len).join(' ');
+      const prefix = incomingWords.slice(0, len).join(' ');
+      if (suffix === prefix) {
+        return incomingWords.slice(len).join(' ');
+      }
+    }
+    return incoming;
+  }
+ 
   if (!SpeechRecognition) {
     unsupportedWarning.style.display = 'block';
     recordBtn.disabled = true;
@@ -205,20 +257,17 @@
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'ar-SA';
-
+ 
     recognition.onstart = () => statusEl.textContent = 'الحالة: جاري الاستماع...';
-
-    let lastFinalChunk = '';
-
+ 
     recognition.onresult = (event) => {
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const t = event.results[i][0].transcript.trim();
         if (event.results[i].isFinal) {
-          // تجاهل التكرار إذا كان نفس المقطع الأخير (يحدث عند إعادة تشغيل التعرف تلقائياً)
-          if (t && t !== lastFinalChunk) {
-            finalTranscript += t + ' ';
-            lastFinalChunk = t;
+          if (t) {
+            const cleaned = stripOverlap(finalTranscript, t);
+            if (cleaned) finalTranscript += cleaned + ' ';
           }
         } else {
           interim += t;
@@ -226,14 +275,21 @@
       }
       currentSegment.value = finalTranscript + interim;
     };
-
+ 
     recognition.onerror = (e) => statusEl.textContent = 'خطأ: ' + e.error;
-
-    // لا نعيد تشغيل التعرف تلقائياً بعد توقفه — إعادة التشغيل التلقائي هي السبب
-    // الرئيسي لتكرار الكلمات على متصفحات الهاتف. إذا توقف الاستماع من تلقاء نفسه
-    // (بعد صمت قصير)، فقط نحدّث الواجهة ونطلب من المستخدم الضغط على "ابدأ" مجدداً.
+ 
     recognition.onend = () => {
-      if (isRecording) {
+      if (!isRecording) return;
+      if (isMobile) {
+        // على الهاتف: نعيد التشغيل تلقائياً (مع معالجة التداخل أعلاه) لتفادي التوقف المتكرر
+        statusEl.textContent = 'الحالة: جاري الاستماع...';
+        setTimeout(() => {
+          if (isRecording) {
+            try { recognition.start(); } catch (e) { /* يعمل بالفعل */ }
+          }
+        }, 200);
+      } else {
+        // على الكمبيوتر: لا نعيد التشغيل تلقائياً (هذا السلوك أثبت استقراره)
         isRecording = false;
         recordBtn.textContent = '🎤 ابدأ التسجيل';
         recordBtn.classList.remove('btn-red');
@@ -241,11 +297,10 @@
         statusEl.textContent = 'الحالة: توقف الاستماع (صمت) - اضغط ابدأ للمتابعة أو أكّد المقطع';
       }
     };
-
+ 
     recordBtn.addEventListener('click', () => {
       if (!isRecording) {
         finalTranscript = currentSegment.value ? currentSegment.value + ' ' : '';
-        lastFinalChunk = '';
         recognition.start();
         isRecording = true;
         recordBtn.textContent = '⏹ إيقاف التسجيل';
@@ -261,11 +316,11 @@
       }
     });
   }
-
+ 
   // ---------- المقاطع المؤكدة ----------
   const segmentsList = document.getElementById('segmentsList');
   let confirmedSegments = [];
-
+ 
   function renderSegments() {
     if (confirmedSegments.length === 0) {
       segmentsList.innerHTML = '<div class="empty-note">لا توجد مقاطع مؤكدة بعد</div>';
@@ -285,7 +340,7 @@
       });
     });
   }
-
+ 
   document.getElementById('confirmSegmentBtn').addEventListener('click', () => {
     const text = currentSegment.value.trim();
     if (!text) { alert('لا يوجد نص لتأكيده.'); return; }
@@ -294,26 +349,26 @@
     finalTranscript = '';
     renderSegments();
   });
-
+ 
   document.getElementById('discardSegmentBtn').addEventListener('click', () => {
     currentSegment.value = '';
     finalTranscript = '';
   });
-
+ 
   // ---------- الإنهاء والحفظ ----------
   document.getElementById('finishBtn').addEventListener('click', () => {
     if (isRecording) { alert('أوقف التسجيل أولاً.'); return; }
     if (confirmedSegments.length === 0) { alert('لا توجد مقاطع مؤكدة لحفظها.'); return; }
     if (!opDate.value) { alert('يرجى تحديد التاريخ.'); return; }
-
+ 
     const base = buildBaseFilename();
     const count = generatedFilenames[base] || 0;
     const versionSuffix = count > 0 ? `-v${count + 1}` : '';
     const finalName = `${base}${versionSuffix}`;
     generatedFilenames[base] = count + 1;
-
+ 
     const bodyParagraphs = confirmedSegments.map(s => `<p>${s}</p>`).join('\n');
-
+ 
     const htmlContent = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office'
             xmlns:w='urn:schemas-microsoft-com:office:word'
@@ -322,13 +377,13 @@
       <body dir="rtl" style="font-family:Arial; font-size:14pt;">
         <h2>${sanitize(opType.value)}</h2>
         <p><b>القسم:</b> ${deptSelect.value}</p>
-        <p><b>الطرف/المصدر:</b> ${sanitize(partyName.value)}</p>
+        <p><b>الطرف/المصدر:</b> ${sanitize(partySelect.value)}</p>
         <p><b>التاريخ:</b> ${opDate.value}</p>
         <hr/>
         ${bodyParagraphs}
       </body>
       </html>`;
-
+ 
     const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -338,16 +393,16 @@
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-
+ 
     // إقفال العملية الحالية وتصفير الحقول لبدء عملية جديدة
     confirmedSegments = [];
     renderSegments();
     currentSegment.value = '';
     opType.value = '';
-    partyName.value = '';
     updateFilenamePreview();
     statusEl.textContent = 'الحالة: تم حفظ المستند وإقفال العملية. يمكنك بدء عملية جديدة.';
   });
 </script>
 </body>
 </html>
+ 

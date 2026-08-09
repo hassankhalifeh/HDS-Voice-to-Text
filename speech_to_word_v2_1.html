@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تحويل الصوت إلى نص - نسخة الأقسام</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Tahoma', Arial, sans-serif;
+    background: #f2f4f7;
+    margin: 0;
+    padding: 14px;
+    direction: rtl;
+  }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  h1 { font-size: 19px; text-align: center; color: #222; margin: 0 0 4px; }
+  p.subtitle { text-align: center; color: #777; font-size: 12px; margin: 0 0 16px; }
+  fieldset {
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  legend { font-size: 13px; font-weight: bold; color: #444; padding: 0 6px; }
+  label { display: block; font-size: 13px; color: #333; margin: 8px 0 4px; }
+  input[type=text], input[type=date], select, textarea {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 15px;
+    font-family: inherit;
+  }
+  .row { display: flex; gap: 8px; align-items: flex-end; }
+  .row > div { flex: 1; }
+  .row button { flex: 0 0 auto; padding: 10px 12px; }
+  button {
+    border: none; border-radius: 10px; padding: 12px 16px;
+    font-size: 14px; cursor: pointer; transition: 0.2s;
+  }
+  button:active { transform: scale(0.97); }
+  .btn-green { background: #4CAF50; color: white; }
+  .btn-red { background: #f44336; color: white; }
+  .btn-blue { background: #2196F3; color: white; }
+  .btn-grey { background: #e0e0e0; color: #333; }
+  .buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 10px 0; }
+  .status { text-align: center; font-size: 13px; color: #555; min-height: 18px; margin-bottom: 6px; }
+  textarea#currentSegment { min-height: 90px; }
+  .segments { border: 1px dashed #ccc; border-radius: 10px; padding: 10px; min-height: 60px; }
+  .segment-item {
+    background: #f7f9fb; border: 1px solid #e2e6ea; border-radius: 8px;
+    padding: 8px; margin-bottom: 8px; font-size: 14px; position: relative;
+  }
+  .segment-item .del-btn {
+    position: absolute; left: 6px; top: 6px; background: #f44336; color: white;
+    border-radius: 6px; padding: 2px 8px; font-size: 12px; cursor: pointer;
+  }
+  .empty-note { color: #999; font-size: 13px; text-align: center; }
+  .warning {
+    background: #fff3cd; color: #856404; padding: 10px; border-radius: 8px;
+    font-size: 13px; text-align: center; margin-bottom: 12px; display: none;
+  }
+  .filename-preview {
+    text-align: center; font-size: 13px; color: #2196F3; margin-top: 6px;
+    direction: ltr; word-break: break-all;
+  }
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 1000; align-items: center; justify-content: center; padding: 14px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: white; border-radius: 14px; padding: 18px; max-width: 640px;
+    width: 100%; max-height: 90vh; overflow-y: auto;
+  }
+  .modal-box h2 { font-size: 17px; text-align: center; margin: 0 0 12px; }
+  .review-grid {
+    width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 12px;
+  }
+  .review-grid th, .review-grid td {
+    border: 1px solid #ddd; padding: 8px; text-align: right; vertical-align: top;
+  }
+  .review-grid th {
+    background: #f2f4f7; width: 30%; white-space: nowrap;
+  }
+  .review-warning {
+    background: #fff3cd; color: #856404; padding: 8px; border-radius: 8px;
+    font-size: 12px; text-align: center; margin-bottom: 10px;
+  }
+  .login-overlay {
+    position: fixed; inset: 0; background: #f2f4f7; z-index: 2000;
+    display: flex; align-items: center; justify-content: center; padding: 14px;
+  }
+  .login-box {
+    background: white; border-radius: 14px; padding: 22px; max-width: 380px; width: 100%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  .login-box h2 { text-align: center; font-size: 18px; margin: 0 0 16px; }
+  .login-error { color: #f44336; font-size: 13px; text-align: center; min-height: 18px; margin-top: 6px; }
+  .company-badge {
+    background: #e8f4fd; border: 1px solid #b6e0fe; border-radius: 10px;
+    padding: 10px; text-align: center; margin-bottom: 14px; font-size: 14px;
+  }
+  .company-badge b { color: #0d6efd; }
+  .company-badge select { margin-top: 6px; }
+  .logout-link {
+    position: absolute; left: 10px; top: 10px; font-size: 12px; color: #999;
+    cursor: pointer; text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+
+<!-- شاشة تسجيل الدخول -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>🔒 تسجيل الدخول</h2>
+    <label>البريد الإلكتروني</label>
+    <input type="text" id="loginEmail" placeholder="example@company.com">
+    <label style="margin-top:10px;">كلمة المرور</label>
+    <input type="password" id="loginPassword" placeholder="••••••••">
+    <div class="buttons" style="margin-top:14px;">
+      <button id="loginBtn" class="btn-blue" style="width:100%;">دخول</button>
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <div style="text-align:center; margin-top:12px; font-size:12px;">
+      مستخدم جديد؟ <a href="#" id="signupLink" style="color:#2196F3;">إنشاء حساب</a>
+    </div>
+    <div style="text-align:center; font-size:11px; color:#999; margin-top:6px;">
+      بعد إنشاء الحساب، تواصل مع مدير البرنامج لربطك بشركتك.
+    </div>
+  </div>
+</div>
+
+<div class="container" id="mainApp" style="display:none; position:relative;">
+  <span class="logout-link" id="logoutLink">خروج</span>
+  <h1>🎤 تحويل الصوت إلى نص - حسب الأقسام</h1>
+  <p class="subtitle">كل عملية تسجيل تُحفظ كملف Word مستقل</p>
+
+  <div class="company-badge" id="companyBadge">
+    الشركة الحالية: <b id="companyNameLabel">...</b>
+    <div id="companySwitcherWrap" style="display:none;">
+      <select id="companySwitcher"></select>
+    </div>
+  </div>
+
+  <div id="unsupportedWarning" class="warning">
+    ⚠️ متصفحك لا يدعم التعرف على الصوت. استخدم Chrome.
+  </div>
+
+  <!-- بيانات العملية -->
+  <fieldset>
+    <legend>بيانات العملية</legend>
+
+    <label>القسم</label>
+    <div class="row">
+      <div>
+        <select id="deptSelect"></select>
+      </div>
+      <button class="btn-grey" id="addDeptBtn">+ قسم جديد</button>
+    </div>
+
+    <label>نوع العملية</label>
+    <input type="text" id="opType" placeholder="مثال: تسجيل استلام، جرد، ملاحظة">
+
+    <label>اسم الطرف / المصدر</label>
+    <div class="row">
+      <div>
+        <select id="partySelect"></select>
+      </div>
+      <button class="btn-grey" id="addPartyBtn">+ مصدر جديد</button>
+    </div>
+
+    <label>التاريخ</label>
+    <input type="date" id="opDate">
+
+    <div class="filename-preview" id="filenamePreview"></div>
+  </fieldset>
+
+  <!-- التسجيل -->
+  <fieldset>
+    <legend>تسجيل مقطع جديد</legend>
+    <div class="buttons">
+      <button id="recordBtn" class="btn-green">🎤 ابدأ التسجيل</button>
+    </div>
+    <div class="status" id="status">الحالة: جاهز</div>
+    <textarea id="currentSegment" placeholder="سيظهر نص المقطع هنا... يمكنك تعديله قبل التأكيد"></textarea>
+    <div class="buttons">
+      <button id="confirmSegmentBtn" class="btn-blue">✔ تأكيد وإضافة المقطع</button>
+      <button id="discardSegmentBtn" class="btn-grey">✖ تجاهل المقطع</button>
+    </div>
+  </fieldset>
+
+  <!-- المقاطع المؤكدة -->
+  <fieldset>
+    <legend>المقاطع المؤكدة في هذه العملية</legend>
+    <div class="segments" id="segmentsList">
+      <div class="empty-note">لا توجد مقاطع مؤكدة بعد</div>
+    </div>
+  </fieldset>
+
+  <div class="buttons">
+    <button id="finishBtn" class="btn-blue" style="min-width:220px;">👁 مراجعة وتأكيد نهائي (حفظ Word)</button>
+  </div>
+  <div class="buttons">
+    <button id="exportExcelBtn" class="btn-grey" style="min-width:220px;">🧾 تصدير جدول Excel لكل العمليات المسجّلة</button>
+  </div>
+  <div class="status" id="excelStatus" style="margin-top:4px;"></div>
+</div>
+
+<!-- نافذة مراجعة البيانات قبل التحفيظ النهائي -->
+<div class="modal-overlay" id="reviewModal">
+  <div class="modal-box">
+    <h2>📋 مراجعة البيانات قبل الحفظ النهائي</h2>
+    <div class="review-warning">تحقق من كل المعلومات أدناه جيداً — بعد التأكيد سيُنشأ ملف Word ويُحفظ سجل دائم في قاعدة البيانات.</div>
+    <table class="review-grid">
+      <tr><th>الشركة</th><td id="reviewCompany"></td></tr>
+      <tr><th>القسم</th><td id="reviewDept"></td></tr>
+      <tr><th>نوع العملية</th><td id="reviewType"></td></tr>
+      <tr><th>المصدر</th><td id="reviewParty"></td></tr>
+      <tr><th>التاريخ</th><td id="reviewDate"></td></tr>
+      <tr><th>عدد المقاطع</th><td id="reviewCount"></td></tr>
+      <tr><th>النص الكامل</th><td id="reviewText" style="white-space:pre-wrap;"></td></tr>
+    </table>
+    <div class="buttons">
+      <button id="cancelReviewBtn" class="btn-grey">✖ رجوع للتعديل</button>
+      <button id="confirmReviewBtn" class="btn-green">✔ تأكيد نهائي وحفظ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- إعداد الاتصال بـ Supabase ----------
+  const SUPABASE_URL = 'https://hbgombfetvvbwvdlakvn.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_OYOiofTnCNYDyf5O5jVpaQ_BwlLzBlW';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ---------- تسجيل الدخول والشركات ----------
+  let currentUserId = null;
+  let currentCompanyId = null;
+  let allowedCompanies = []; // [{id, name}]
+
+  const loginOverlay = document.getElementById('loginOverlay');
+  const mainApp = document.getElementById('mainApp');
+  const loginError = document.getElementById('loginError');
+  const companyNameLabel = document.getElementById('companyNameLabel');
+  const companySwitcherWrap = document.getElementById('companySwitcherWrap');
+  const companySwitcher = document.getElementById('companySwitcher');
+
+  async function loadAllowedCompanies() {
+    const { data: userData } = await supabaseClient.auth.getUser();
+    currentUserId = userData.user.id;
+
+    const { data, error } = await supabaseClient
+      .from('user_companies')
+      .select('company_id, companies(id, company_name)')
+      .eq('user_id', currentUserId);
+
+    if (error || !data || data.length === 0) {
+      loginError.textContent = 'لا توجد شركة مرتبطة بهذا الحساب. تواصل مع مدير البرنامج.';
+      await supabaseClient.auth.signOut();
+      return false;
+    }
+
+    allowedCompanies = data.map(r => ({ id: r.companies.id, name: r.companies.company_name }));
+    currentCompanyId = allowedCompanies[0].id;
+    companyNameLabel.textContent = allowedCompanies[0].name;
+
+    if (allowedCompanies.length > 1) {
+      companySwitcherWrap.style.display = 'block';
+      companySwitcher.innerHTML = '';
+      allowedCompanies.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        companySwitcher.appendChild(opt);
+      });
+      companySwitcher.addEventListener('change', () => {
+        currentCompanyId = companySwitcher.value;
+        const chosen = allowedCompanies.find(c => c.id === currentCompanyId);
+        companyNameLabel.textContent = chosen ? chosen.name : '';
+      });
+    } else {
+      companySwitcherWrap.style.display = 'none';
+    }
+    return true;
+  }
+
+  async function showAppIfLoggedIn() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (data.session) {
+      const ok = await loadAllowedCompanies();
+      if (ok) {
+        loginOverlay.style.display = 'none';
+        mainApp.style.display = 'block';
+      } else {
+        loginOverlay.style.display = 'flex';
+      }
+    }
+  }
+  showAppIfLoggedIn();
+
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    loginError.textContent = '';
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!email || !password) { loginError.textContent = 'أدخل البريد وكلمة المرور.'; return; }
+
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) {
+      loginError.textContent = 'بيانات الدخول غير صحيحة.';
+      return;
+    }
+    await showAppIfLoggedIn();
+  });
+
+  document.getElementById('logoutLink').addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+    location.reload();
+  });
+
+  document.getElementById('signupLink').addEventListener('click', async (e) => {
+    e.preventDefault();
+    loginError.textContent = '';
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!email || !password) { loginError.textContent = 'أدخل بريداً وكلمة مرور (6 أحرف على الأقل) ثم اضغط "إنشاء حساب".'; return; }
+
+    const { error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) {
+      loginError.textContent = 'تعذّر إنشاء الحساب: ' + error.message;
+      return;
+    }
+    loginError.style.color = '#2e7d32';
+    loginError.textContent = 'تم إنشاء الحساب. تواصل مع مدير البرنامج لربطك بشركتك، ثم سجّل الدخول من هنا.';
+  });
+
+  // ---------- الأقسام ----------
+  const deptSelect = document.getElementById('deptSelect');
+  let departments = ['الاستلام', 'التحميل', 'المرتجعات'];
+
+  function renderDepartments() {
+    deptSelect.innerHTML = '';
+    departments.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = d;
+      deptSelect.appendChild(opt);
+    });
+  }
+  renderDepartments();
+
+  document.getElementById('addDeptBtn').addEventListener('click', () => {
+    const name = prompt('اسم القسم الجديد:');
+    if (name && name.trim()) {
+      departments.push(name.trim());
+      renderDepartments();
+      deptSelect.value = name.trim();
+      updateFilenamePreview();
+    }
+  });
+
+  // ---------- المصادر (من ملف Orders_HDS - صفحة المعلومات الرئيسية، عمود B) ----------
+  const partySelect = document.getElementById('partySelect');
+  let parties = [
+    'Fast Delivery', 'A Z علي دهيني', 'Eleganza  محمد الدر', 'حشّوش',
+    'محمد حمود Spiky', 'فاطمة فركوح', 'WAKA', 'NEUF NEUF', 'Eyeconic',
+    'متفرقات', 'ريان طبل', 'البقاعي', 'Vengo', 'محمد جهاد عكوش',
+    'System Tunes البرنامج', 'علي أخضر', 'أحمد حموي', 'ITOS',
+    'BS International', 'أبو صالح', 'Ya Delivery', 'نسرين عباية',
+    'Outlet Adam', 'زهراء أون لاين', 'D Fast', 'علي علامة'
+  ];
+
+  function renderParties() {
+    partySelect.innerHTML = '';
+    parties.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p; opt.textContent = p;
+      partySelect.appendChild(opt);
+    });
+  }
+  renderParties();
+
+  document.getElementById('addPartyBtn').addEventListener('click', () => {
+    const name = prompt('اسم المصدر الجديد:');
+    if (name && name.trim()) {
+      parties.push(name.trim());
+      renderParties();
+      partySelect.value = name.trim();
+      updateFilenamePreview();
+    }
+  });
+
+  // ---------- الحقول ----------
+  const opType = document.getElementById('opType');
+  const opDate = document.getElementById('opDate');
+  const filenamePreview = document.getElementById('filenamePreview');
+
+  // التاريخ الافتراضي = اليوم
+  opDate.value = new Date().toISOString().split('T')[0];
+
+  // سجل أسماء الملفات المولّدة في هذه الجلسة (للترقيم v1, v2...)
+  const generatedFilenames = {};
+
+  function sanitize(str) {
+    return (str || '').trim().replace(/[\\/:*?"<>|]/g, '_') || 'بدون_اسم';
+  }
+
+  function buildBaseFilename() {
+    const companyPart = companyNameLabel.textContent ? sanitize(companyNameLabel.textContent) : 'بدون_شركة';
+    return `${companyPart}-${sanitize(opType.value)}-${sanitize(partySelect.value)}-${opDate.value || ''}`;
+  }
+
+  function updateFilenamePreview() {
+    const base = buildBaseFilename();
+    const count = generatedFilenames[base] || 0;
+    const suffix = count > 0 ? `-v${count + 1}` : '';
+    filenamePreview.textContent = `سيُحفظ باسم: ${base}${suffix}.doc`;
+  }
+  [opType, partySelect, opDate].forEach(el => el.addEventListener('input', updateFilenamePreview));
+  updateFilenamePreview();
+
+  // ---------- التعرف على الصوت ----------
+  const recordBtn = document.getElementById('recordBtn');
+  const statusEl = document.getElementById('status');
+  const currentSegment = document.getElementById('currentSegment');
+  const unsupportedWarning = document.getElementById('unsupportedWarning');
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  let recognition = null, isRecording = false, finalTranscript = '';
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+  // يزيل أي تداخل متكرر بين نهاية النص الحالي وبداية المقطع الجديد
+  // (يحدث على الهاتف عند إعادة تشغيل التعرف بسرعة فيُعاد التقاط 2-3 كلمات سابقة)
+  function stripOverlap(existing, incoming) {
+    const existingWords = existing.trim().split(/\s+/).filter(Boolean);
+    const incomingWords = incoming.trim().split(/\s+/).filter(Boolean);
+    const maxCheck = Math.min(existingWords.length, incomingWords.length, 6);
+    for (let len = maxCheck; len > 0; len--) {
+      const suffix = existingWords.slice(-len).join(' ');
+      const prefix = incomingWords.slice(0, len).join(' ');
+      if (suffix === prefix) {
+        return incomingWords.slice(len).join(' ');
+      }
+    }
+    return incoming;
+  }
+
+  if (!SpeechRecognition) {
+    unsupportedWarning.style.display = 'block';
+    recordBtn.disabled = true;
+  } else {
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'ar-SA';
+
+    recognition.onstart = () => statusEl.textContent = 'الحالة: جاري الاستماع...';
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript.trim();
+        if (event.results[i].isFinal) {
+          if (t) {
+            const cleaned = stripOverlap(finalTranscript, t);
+            if (cleaned) finalTranscript += cleaned + ' ';
+          }
+        } else {
+          interim += t;
+        }
+      }
+      currentSegment.value = finalTranscript + interim;
+    };
+
+    recognition.onerror = (e) => statusEl.textContent = 'خطأ: ' + e.error;
+
+    recognition.onend = () => {
+      if (!isRecording) return;
+      if (isMobile) {
+        // على الهاتف: نعيد التشغيل تلقائياً (مع معالجة التداخل أعلاه) لتفادي التوقف المتكرر
+        statusEl.textContent = 'الحالة: جاري الاستماع...';
+        setTimeout(() => {
+          if (isRecording) {
+            try { recognition.start(); } catch (e) { /* يعمل بالفعل */ }
+          }
+        }, 200);
+      } else {
+        // على الكمبيوتر: لا نعيد التشغيل تلقائياً (هذا السلوك أثبت استقراره)
+        isRecording = false;
+        recordBtn.textContent = '🎤 ابدأ التسجيل';
+        recordBtn.classList.remove('btn-red');
+        recordBtn.classList.add('btn-green');
+        statusEl.textContent = 'الحالة: توقف الاستماع (صمت) - اضغط ابدأ للمتابعة أو أكّد المقطع';
+      }
+    };
+
+    recordBtn.addEventListener('click', () => {
+      if (!isRecording) {
+        finalTranscript = currentSegment.value ? currentSegment.value + ' ' : '';
+        recognition.start();
+        isRecording = true;
+        recordBtn.textContent = '⏹ إيقاف التسجيل';
+        recordBtn.classList.remove('btn-green');
+        recordBtn.classList.add('btn-red');
+      } else {
+        isRecording = false;
+        recognition.stop();
+        recordBtn.textContent = '🎤 ابدأ التسجيل';
+        recordBtn.classList.remove('btn-red');
+        recordBtn.classList.add('btn-green');
+        statusEl.textContent = 'الحالة: جاهز - راجع النص ثم أكّده';
+      }
+    });
+  }
+
+  // ---------- المقاطع المؤكدة ----------
+  const segmentsList = document.getElementById('segmentsList');
+  let confirmedSegments = [];
+
+  function renderSegments() {
+    if (confirmedSegments.length === 0) {
+      segmentsList.innerHTML = '<div class="empty-note">لا توجد مقاطع مؤكدة بعد</div>';
+      return;
+    }
+    segmentsList.innerHTML = '';
+    confirmedSegments.forEach((seg, idx) => {
+      const div = document.createElement('div');
+      div.className = 'segment-item';
+      div.innerHTML = `<span class="del-btn" data-idx="${idx}">حذف</span><div>${idx + 1}. ${seg}</div>`;
+      segmentsList.appendChild(div);
+    });
+    segmentsList.querySelectorAll('.del-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        confirmedSegments.splice(Number(btn.dataset.idx), 1);
+        renderSegments();
+      });
+    });
+  }
+
+  document.getElementById('confirmSegmentBtn').addEventListener('click', () => {
+    const text = currentSegment.value.trim();
+    if (!text) { alert('لا يوجد نص لتأكيده.'); return; }
+    confirmedSegments.push(text);
+    currentSegment.value = '';
+    finalTranscript = '';
+    renderSegments();
+  });
+
+  document.getElementById('discardSegmentBtn').addEventListener('click', () => {
+    currentSegment.value = '';
+    finalTranscript = '';
+  });
+
+  // ---------- المراجعة قبل الحفظ النهائي ----------
+  const reviewModal = document.getElementById('reviewModal');
+
+  document.getElementById('finishBtn').addEventListener('click', () => {
+    if (isRecording) { alert('أوقف التسجيل أولاً.'); return; }
+    if (confirmedSegments.length === 0) { alert('لا توجد مقاطع مؤكدة لحفظها.'); return; }
+    if (!opDate.value) { alert('يرجى تحديد التاريخ.'); return; }
+
+    // تعبئة شبكة المراجعة بكل المعلومات كما ستُحفظ بالضبط
+    document.getElementById('reviewCompany').textContent = companyNameLabel.textContent;
+    document.getElementById('reviewDept').textContent = deptSelect.value;
+    document.getElementById('reviewType').textContent = sanitize(opType.value);
+    document.getElementById('reviewParty').textContent = sanitize(partySelect.value);
+    document.getElementById('reviewDate').textContent = opDate.value;
+    document.getElementById('reviewCount').textContent = confirmedSegments.length + ' مقطع';
+    document.getElementById('reviewText').textContent = confirmedSegments.join('\n\n');
+
+    reviewModal.classList.add('open');
+  });
+
+  document.getElementById('cancelReviewBtn').addEventListener('click', () => {
+    reviewModal.classList.remove('open');
+  });
+
+  document.getElementById('confirmReviewBtn').addEventListener('click', () => {
+    reviewModal.classList.remove('open');
+    performFinalSave();
+  });
+
+  // ---------- الحفظ النهائي الفعلي (يُنفَّذ فقط بعد التأكيد من شاشة المراجعة) ----------
+  function performFinalSave() {
+    // توثيق لحظة التأكيد النهائي من المستخدم
+    const confirmedAt = new Date().toLocaleString('ar-LB', { hour12: false });
+
+    const base = buildBaseFilename();
+    const count = generatedFilenames[base] || 0;
+    const versionSuffix = count > 0 ? `-v${count + 1}` : '';
+    const finalName = `${base}${versionSuffix}`;
+    generatedFilenames[base] = count + 1;
+
+    const bodyParagraphs = confirmedSegments.map(s => `<p>${s}</p>`).join('\n');
+    const fullText = confirmedSegments.join(' ');
+
+    const htmlContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office'
+            xmlns:w='urn:schemas-microsoft-com:office:word'
+            xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset="utf-8"><title>${finalName}</title></head>
+      <body dir="rtl" style="font-family:Arial; font-size:14pt;">
+        <h2>${sanitize(opType.value)}</h2>
+        <p><b>الشركة:</b> ${companyNameLabel.textContent}</p>
+        <p><b>القسم:</b> ${deptSelect.value}</p>
+        <p><b>الطرف/المصدر:</b> ${sanitize(partySelect.value)}</p>
+        <p><b>التاريخ:</b> ${opDate.value}</p>
+        <hr/>
+        ${bodyParagraphs}
+        <hr/>
+        <p style="font-size:10pt; color:#666;">تم التأكيد النهائي من قبل المستخدم بتاريخ ووقت: ${confirmedAt}</p>
+      </body>
+      </html>`;
+
+    const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = finalName + '.doc';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    // تسجيل هذه العملية في السجل التراكمي (لتصدير جدول Excel لاحقاً)
+    operationsLog.push({
+      القسم: deptSelect.value,
+      'نوع العملية': sanitize(opType.value),
+      'المصدر': sanitize(partySelect.value),
+      'التاريخ': opDate.value,
+      'النص الكامل': fullText,
+      'وقت التأكيد النهائي': confirmedAt
+    });
+    excelStatus.textContent = `تم تسجيل ${operationsLog.length} عملية حتى الآن (يمكن تصديرها كجدول Excel).`;
+
+    // حفظ العملية في Supabase (التاريخ، القسم، المصدر، النص، ونوع العملية للفرز لاحقاً في تصدير Superadmin)
+    // ملاحظة: عمود created_at في القاعدة يُسجَّل تلقائياً لحظة هذا الحفظ، وهو نفس لحظة التأكيد النهائي أعلاه
+    supabaseClient.from('Voice-transcriptions').insert({
+      record_date: opDate.value,
+      department: deptSelect.value,
+      source_name: sanitize(partySelect.value),
+      transcription_text: fullText,
+      company_id: currentCompanyId,
+      Type_Of_Operation: sanitize(opType.value)
+    }).then(({ error }) => {
+      if (error) {
+        statusEl.textContent = 'الحالة: تم حفظ Word، لكن فشل الحفظ السحابي: ' + error.message;
+      } else {
+        statusEl.textContent = `الحالة: تم التأكيد والحفظ (Word + سحابياً) بتاريخ ${confirmedAt}. يمكنك بدء عملية جديدة.`;
+      }
+    });
+
+    // إقفال العملية الحالية وتصفير الحقول لبدء عملية جديدة
+    confirmedSegments = [];
+    renderSegments();
+    currentSegment.value = '';
+    opType.value = '';
+    updateFilenamePreview();
+  }
+
+  // ---------- سجل العمليات وتصدير Excel ----------
+  let operationsLog = [];
+  const excelStatus = document.getElementById('excelStatus');
+
+  document.getElementById('exportExcelBtn').addEventListener('click', () => {
+    if (operationsLog.length === 0) {
+      alert('لا توجد أي عملية مكتملة بعد لتصديرها. أنهِ عملية واحدة على الأقل أولاً.');
+      return;
+    }
+    // تجميع العمليات حسب المصدر، وإنشاء ورقة منفصلة لكل مصدر
+    const bySource = {};
+    operationsLog.forEach(op => {
+      const src = op['المصدر'] || 'بدون_اسم';
+      if (!bySource[src]) bySource[src] = [];
+      bySource[src].push(op);
+    });
+
+    const wb = XLSX.utils.book_new();
+
+    // اسم الورقة في Excel محدود بـ 31 حرفاً ولا يقبل رموزاً معينة
+    function safeSheetName(name, usedNames) {
+      let clean = name.replace(/[\\/*?:\[\]]/g, '_').slice(0, 31) || 'مصدر';
+      let finalName = clean;
+      let counter = 2;
+      while (usedNames.has(finalName)) {
+        const suffix = `_${counter}`;
+        finalName = clean.slice(0, 31 - suffix.length) + suffix;
+        counter++;
+      }
+      usedNames.add(finalName);
+      return finalName;
+    }
+
+    const usedSheetNames = new Set();
+    Object.keys(bySource).sort((a, b) => a.localeCompare(b, 'ar')).forEach(src => {
+      const rows = bySource[src].sort((a, b) => a['التاريخ'].localeCompare(b['التاريخ']));
+      const ws = XLSX.utils.json_to_sheet(rows, {
+        header: ['القسم', 'نوع العملية', 'المصدر', 'التاريخ', 'النص الكامل']
+      });
+      ws['!cols'] = [
+        { wch: 14 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 60 }
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, safeSheetName(src, usedSheetNames));
+    });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `سجل_عمليات_${todayStr}.xlsx`);
+  });
+</script>
+</body>
+</html>

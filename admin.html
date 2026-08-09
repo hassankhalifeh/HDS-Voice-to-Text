@@ -90,6 +90,10 @@
           <label>نوع العملية (اختياري)</label>
           <input type="text" id="exportOpType" placeholder="اتركه فارغاً لكل الأنواع">
         </div>
+        <div>
+          <label>القسم (اختياري)</label>
+          <input type="text" id="exportDept" placeholder="اتركه فارغاً لكل الأقسام">
+        </div>
       </div>
       <div class="row-flex" style="margin-top:10px;">
         <button class="btn-blue" id="exportBtn">تصدير Excel</button>
@@ -286,6 +290,7 @@
     const fromDate = document.getElementById('exportFrom').value;
     const toDate = document.getElementById('exportTo').value;
     const opType = document.getElementById('exportOpType').value.trim();
+    const dept = document.getElementById('exportDept').value.trim();
 
     let query = sb.from('Voice-transcriptions')
       .select('record_date, department, source_name, transcription_text, "Type_Of_Operation", created_at')
@@ -293,6 +298,7 @@
     if (fromDate) query = query.gte('record_date', fromDate);
     if (toDate) query = query.lte('record_date', toDate);
     if (opType) query = query.eq('Type_Of_Operation', opType);
+    if (dept) query = query.eq('department', dept);
 
     const { data, error } = await query;
     if (error) { exportStatus.style.color = '#f44336'; exportStatus.textContent = 'خطأ: ' + error.message; return; }
@@ -321,7 +327,8 @@
     const todayStr = new Date().toISOString().split('T')[0];
     const datePart = fromDate || toDate ? `${fromDate || '...'}_${toDate || '...'}` : 'كل_التواريخ';
     const typePart = opType ? sanitize(opType) : 'كل_العمليات';
-    const filename = `${sanitize(companyName)}-${typePart}-${datePart}-صُدّر_${todayStr}.xlsx`;
+    const deptPart = dept ? `-${sanitize(dept)}` : '';
+    const filename = `${sanitize(companyName)}${deptPart}-${typePart}-${datePart}-صُدّر_${todayStr}.xlsx`;
     XLSX.writeFile(wb, filename);
 
     // تحديث وقت آخر تصدير لهذا المدير
